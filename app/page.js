@@ -19,29 +19,26 @@ function Login({done}){
 
 function Exercise({ex,expanded,onToggle,workoutId,reload,onNeedWorkout}){
  const [kg,setKg]=useState(Number(ex.last_weight??ex.default_weight??0));
- const [reps,setReps]=useState(ex.last_reps?.length?ex.last_reps:[12,12,12]);
  const [saved,setSaved]=useState(false); const [busy,setBusy]=useState(false);
- useEffect(()=>{setKg(Number(ex.last_weight??ex.default_weight??0));setReps(ex.last_reps?.length?ex.last_reps:[12,12,12]);setSaved(false)},[ex.id,ex.last_weight]);
- const all12=useMemo(()=>reps.length>=3&&reps.slice(0,3).every(r=>Number(r)>=12),[reps]);
- const suggested=+(kg+Number(ex.increment_kg||0)).toFixed(2);
- async function save(){setBusy(true);let wid=workoutId;if(!wid)wid=await onNeedWorkout();if(!wid){setBusy(false);return;}const {data:{user}}=await supabase.auth.getUser();await supabase.from("workout_sets").delete().eq("workout_id",wid).eq("exercise_id",ex.id);const rows=reps.map((r,i)=>({user_id:user.id,workout_id:wid,exercise_id:ex.id,set_no:i+1,weight_kg:kg,reps:r})); const q=await supabase.from("workout_sets").insert(rows); if(q.error)alert(q.error.message); else {setSaved(true);await reload();} setBusy(false);}
+ useEffect(()=>{setKg(Number(ex.last_weight??ex.default_weight??0));setSaved(false)},[ex.id,ex.last_weight]);
  const pct=ex.previous_weight&&ex.last_weight?(((ex.last_weight-ex.previous_weight)/ex.previous_weight)*100).toFixed(1):null;
+ const suggested=+(kg+Number(ex.increment_kg||0)).toFixed(2);
+ async function save(){setBusy(true);let wid=workoutId;if(!wid)wid=await onNeedWorkout();if(!wid){setBusy(false);return;}const {data:{user}}=await supabase.auth.getUser();await supabase.from("workout_sets").delete().eq("workout_id",wid).eq("exercise_id",ex.id);const reps=(ex.last_reps?.length?ex.last_reps:[12,12,12]);const rows=reps.map((r,i)=>({user_id:user.id,workout_id:wid,exercise_id:ex.id,set_no:i+1,weight_kg:kg,reps:r})); const q=await supabase.from("workout_sets").insert(rows); if(q.error)alert(q.error.message); else {setSaved(true);await reload();} setBusy(false);}
  return <article className={`exercise-row ${expanded?"open":""} ${saved?"saved-row":""}`}>
    <button className="exercise-summary" onClick={onToggle}>
-     <div><h3>{ex.name}</h3><small>{ex.last_reps?.length?`${ex.last_reps.join(" / ")} tekrar`:"Henüz kayıt yok"}</small></div>
+     <div><h3>{ex.name}</h3></div>
      <div className="summary-right"><b>{ex.last_weight!=null?`${ex.last_weight} kg`:"— kg"}</b><ChevronDown className={expanded?"rotated":""}/></div>
    </button>
    {expanded&&<div className="exercise-detail">
-     <div className="meta-line"><span>Artış adımı {ex.increment_kg} kg{ex.last_increase_at?` · Son artış ${new Date(ex.last_increase_at).toLocaleDateString("tr-TR")}`:""}</span>{saved?<span className="done"><Check/> Kaydedildi</span>:pct>0&&<span className="badge"><TrendingUp/> +%{pct}</span>}</div>
-     {all12&&<div className="suggestion">3×12 tamamlandıysa sonraki antrenman önerisi: <b>{suggested} kg</b></div>}
-     <label>Ağırlık</label><Stepper value={kg} step={Number(ex.increment_kg)} onChange={v=>{setKg(v);setSaved(false)}} suffix="kg"/>
-     <label>Tekrarlar</label><div className="sets">{reps.map((r,i)=><div className="set" key={i}><span>Set {i+1}</span><Stepper value={r} onChange={v=>{let x=[...reps];x[i]=v;setReps(x);setSaved(false)}}/></div>)}</div>
-     <button className={`save ${saved?"saved-btn":""}`} onClick={save} disabled={busy}>{saved?<><Check/> Güncelle</>:<><Save/> {busy?"Kaydediliyor…":"Kaydet"}</>}</button>
+     <div className="meta-line"><span>{ex.last_increase_at?`Son artış · ${new Date(ex.last_increase_at).toLocaleDateString("tr-TR")}`:`Artış adımı · ${ex.increment_kg} kg`}</span>{saved?<span className="done"><Check/> Kaydedildi</span>:pct>0&&<span className="badge"><TrendingUp/> +%{pct}</span>}</div>
+     <label>Çalışma ağırlığı</label><Stepper value={kg} step={Number(ex.increment_kg)} onChange={v=>{setKg(v);setSaved(false)}} suffix="kg"/>
+     <div className="microcopy">Sonraki artış hedefi <b>{suggested} kg</b></div>
+     <button className={`save ${saved?"saved-btn":""}`} onClick={save} disabled={busy}>{saved?<><Check/> Güncelle</>:<><Save/> {busy?"Kaydediliyor…":"Ağırlığı Kaydet"}</>}</button>
    </div>}
  </article>
 }
 
-function DayCard({day,items,session,reload}){
+function DayCard({day,items,reload}){
  const [expanded,setExpanded]=useState(null); const [workoutId,setWorkoutId]=useState(null); const [startedAt,setStartedAt]=useState(null);
  useEffect(()=>{const raw=typeof window!=="undefined"?localStorage.getItem(`active-workout-${day.n}`):null;if(raw){try{const x=JSON.parse(raw);setWorkoutId(x.id);setStartedAt(x.startedAt)}catch{}}},[day.n]);
  async function ensureWorkout(){if(workoutId)return workoutId;const {data:{user}}=await supabase.auth.getUser();const w=await supabase.from("workouts").insert({user_id:user.id,workout_day:day.n}).select("id,performed_at").single();if(w.error){alert(w.error.message);return null;}setWorkoutId(w.data.id);setStartedAt(w.data.performed_at);localStorage.setItem(`active-workout-${day.n}`,JSON.stringify({id:w.data.id,startedAt:w.data.performed_at}));return w.data.id;}
@@ -59,5 +56,5 @@ export default function Home(){
  async function load(){if(!session)return;const rs=await Promise.all(DAYS.map(d=>supabase.rpc("get_exercises_with_last_session",{p_day_no:d.n})));const next={};DAYS.forEach((d,i)=>next[d.n]=rs[i].error?[]:(rs[i].data||[]));setDaysData(next)}
  useEffect(()=>{load()},[session]);
  if(loading)return <main className="center">Yükleniyor…</main>; if(!session)return <Login done={setSession}/>;
- return <main className="shell"><header><div><small>WORKOUT TRACKER</small><h1>Programım</h1></div><button className="icon" onClick={()=>supabase.auth.signOut()}><LogOut/></button></header><p className="intro">Tüm programı buradan gör. Bir harekete dokunduğunda ağırlık ve set ayrıntıları açılır.</p><div className="days-list">{DAYS.map(d=><DayCard key={d.n} day={d} items={daysData[d.n]} session={session} reload={load}/>)}</div></main>
+ return <main className="shell"><header><div><small>WORKOUT TRACKER</small><h1>Programım</h1></div><button className="icon" onClick={()=>supabase.auth.signOut()}><LogOut/></button></header><p className="intro">Bugünkü gücün, dünkü kaydın üzerine kurulur.</p><div className="days-list">{DAYS.map(d=><DayCard key={d.n} day={d} items={daysData[d.n]} reload={load}/>)}</div></main>
 }
