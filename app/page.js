@@ -43,7 +43,7 @@ function Exercise({ex,index,expanded,onToggle,workoutId,reload,onNeedWorkout}){
  const displayName=DISPLAY_NAMES[ex.name]||ex.name;
  return <article className={`exercise-row ${expanded?"open":""} ${saved?"saved-row":""}`}>
    <button className="exercise-summary" onClick={onToggle}>
-     <span className="exercise-number">{String(index+1).padStart(2,"0")}</span>
+     <span className="exercise-number">{index+1}</span>
      <div className="exercise-title"><h3>{displayName}</h3></div>
      <div className="summary-right"><b>{isBodyweight?"Tükeniş":ex.last_weight!=null?`${ex.last_weight} kg`:"— kg"}</b><ChevronDown className={expanded?"rotated":""}/></div>
    </button>
