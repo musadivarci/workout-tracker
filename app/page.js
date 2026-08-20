@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
-import { Minus, Plus, Save, Dumbbell, LogOut, ChevronDown, Check, Play, Flag, TrendingUp } from "lucide-react";
+import { Minus, Plus, Save, Dumbbell, LogOut, ChevronDown, Check, Play, Flag, TrendingUp, History } from "lucide-react";
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 const DAYS=[{n:1,t:"Göğüs + Arka Kol"},{n:2,t:"Sırt + Ön Kol"},{n:3,t:"Omuz + Bacak"}];
@@ -26,7 +26,8 @@ function Exercise({ex,index,expanded,onToggle,workoutId,reload,onNeedWorkout}){
  const isBodyweight=ex.virtual===true;
  const [kg,setKg]=useState(Number(ex.last_weight??ex.default_weight??0));
  const [saved,setSaved]=useState(false); const [busy,setBusy]=useState(false);
- useEffect(()=>{setKg(Number(ex.last_weight??ex.default_weight??0));setSaved(false)},[ex.id,ex.last_weight]);
+ const [historyOpen,setHistoryOpen]=useState(false); const [history,setHistory]=useState([]); const [historyBusy,setHistoryBusy]=useState(false);
+ useEffect(()=>{setKg(Number(ex.last_weight??ex.default_weight??0));setSaved(false);setHistoryOpen(false);setHistory([])},[ex.id,ex.last_weight]);
  const pct=ex.previous_weight&&ex.last_weight?(((ex.last_weight-ex.previous_weight)/ex.previous_weight)*100).toFixed(1):null;
  const suggested=+(kg+Number(ex.increment_kg||0)).toFixed(2);
  async function save(){
@@ -37,8 +38,25 @@ function Exercise({ex,index,expanded,onToggle,workoutId,reload,onNeedWorkout}){
    const reps=(ex.last_reps?.length?ex.last_reps:[12,12,12]);
    const rows=reps.map((r,i)=>({user_id:user.id,workout_id:wid,exercise_id:ex.id,set_no:i+1,weight_kg:kg,reps:r}));
    const q=await supabase.from("workout_sets").insert(rows);
-   if(q.error)alert(q.error.message); else {setSaved(true);await reload();}
+   if(q.error)alert(q.error.message); else {setSaved(true);setHistory([]);await reload();}
    setBusy(false);
+ }
+ async function toggleHistory(){
+   if(historyOpen){setHistoryOpen(false);return;}
+   setHistoryOpen(true);
+   if(history.length)return;
+   setHistoryBusy(true);
+   const q=await supabase.from("workout_sets").select("workout_id,weight_kg,created_at").eq("exercise_id",ex.id).order("created_at",{ascending:false}).limit(36);
+   if(!q.error){
+     const seen=new Set(); const rows=[];
+     for(const r of (q.data||[])){
+       if(seen.has(r.workout_id))continue;
+       seen.add(r.workout_id); rows.push(r);
+       if(rows.length===6)break;
+     }
+     setHistory(rows);
+   }
+   setHistoryBusy(false);
  }
  const displayName=DISPLAY_NAMES[ex.name]||ex.name;
  return <article className={`exercise-row ${expanded?"open":""} ${saved?"saved-row":""}`}>
@@ -52,6 +70,8 @@ function Exercise({ex,index,expanded,onToggle,workoutId,reload,onNeedWorkout}){
        <div className="meta-line"><span>{ex.last_increase_at?`Son artış · ${new Date(ex.last_increase_at).toLocaleDateString("tr-TR")}`:`Artış adımı · ${ex.increment_kg} kg`}</span>{saved?<span className="done"><Check/> Kaydedildi</span>:pct>0&&<span className="badge"><TrendingUp/> +%{pct}</span>}</div>
        <label>Çalışma ağırlığı</label><Stepper value={kg} step={Number(ex.increment_kg)} onChange={v=>{setKg(v);setSaved(false)}} suffix="kg"/>
        <div className="microcopy">Sonraki artış hedefi <b>{suggested} kg</b></div>
+       <div className="detail-actions"><button className="history-btn" onClick={toggleHistory}><History/> {historyOpen?"Geçmişi kapat":"Ağırlık geçmişi"}</button></div>
+       {historyOpen&&<div className="history-panel">{historyBusy?<div className="history-empty">Yükleniyor…</div>:history.length?history.map((r,i)=><div className="history-row" key={`${r.workout_id}-${i}`}><span>{new Date(r.created_at).toLocaleDateString("tr-TR")}</span><b>{Number(r.weight_kg)} kg</b></div>):<div className="history-empty">Henüz geçmiş kayıt yok.</div>}</div>}
        <button className={`save ${saved?"saved-btn":""}`} onClick={save} disabled={busy}>{saved?<><Check/> Güncelle</>:<><Save/> {busy?"Kaydediliyor…":"Ağırlığı Kaydet"}</>}</button>
      </>}
    </div>}
