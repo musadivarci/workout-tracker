@@ -24,12 +24,14 @@ function Login({done}){
 
 function Exercise({ex,index,expanded,onToggle,workoutId,reload,onNeedWorkout}){
  const isBodyweight=ex.virtual===true;
+ const isBarbell=/barbell/i.test(ex.name);
+ const increment=isBarbell?2.5:Number(ex.increment_kg||0);
  const [kg,setKg]=useState(Number(ex.last_weight??ex.default_weight??0));
  const [saved,setSaved]=useState(false); const [busy,setBusy]=useState(false);
  const [historyOpen,setHistoryOpen]=useState(false); const [history,setHistory]=useState([]); const [historyBusy,setHistoryBusy]=useState(false);
  useEffect(()=>{setKg(Number(ex.last_weight??ex.default_weight??0));setSaved(false);setHistoryOpen(false);setHistory([])},[ex.id,ex.last_weight]);
  const pct=ex.previous_weight&&ex.last_weight?(((ex.last_weight-ex.previous_weight)/ex.previous_weight)*100).toFixed(1):null;
- const suggested=+(kg+Number(ex.increment_kg||0)).toFixed(2);
+ const suggested=+(kg+increment).toFixed(2);
  async function save(){
    if(isBodyweight)return;
    setBusy(true);let wid=workoutId;if(!wid)wid=await onNeedWorkout();if(!wid){setBusy(false);return;}
@@ -67,8 +69,8 @@ function Exercise({ex,index,expanded,onToggle,workoutId,reload,onNeedWorkout}){
    </button>
    {expanded&&<div className="exercise-detail">
      {isBodyweight ? <div className="bodyweight-note">Şınavı <b>tükenişe kadar</b> uygula. Bu harekette ağırlık girişi yok.</div> : <>
-       <div className="meta-line"><span>{ex.last_increase_at?`Son artış · ${new Date(ex.last_increase_at).toLocaleDateString("tr-TR")}`:`Artış adımı · ${ex.increment_kg} kg`}</span>{saved?<span className="done"><Check/> Kaydedildi</span>:pct>0&&<span className="badge"><TrendingUp/> +%{pct}</span>}</div>
-       <label>Çalışma ağırlığı</label><Stepper value={kg} step={Number(ex.increment_kg)} onChange={v=>{setKg(v);setSaved(false)}} suffix="kg"/>
+       <div className="meta-line"><span>{ex.last_increase_at?`Son artış · ${new Date(ex.last_increase_at).toLocaleDateString("tr-TR")}`:`Artış adımı · ${increment} kg`}</span>{saved?<span className="done"><Check/> Kaydedildi</span>:pct>0&&<span className="badge"><TrendingUp/> +%{pct}</span>}</div>
+       <label>Çalışma ağırlığı</label><Stepper value={kg} step={increment} onChange={v=>{setKg(v);setSaved(false)}} suffix="kg"/>
        <div className="microcopy">Sonraki artış hedefi <b>{suggested} kg</b></div>
        <div className="detail-actions"><button className="history-btn" onClick={toggleHistory}><History/> {historyOpen?"Geçmişi kapat":"Ağırlık geçmişi"}</button></div>
        {historyOpen&&<div className="history-panel">{historyBusy?<div className="history-empty">Yükleniyor…</div>:history.length?history.map((r,i)=><div className="history-row" key={`${r.workout_id}-${i}`}><span>{new Date(r.created_at).toLocaleDateString("tr-TR")}</span><b>{Number(r.weight_kg)} kg</b></div>):<div className="history-empty">Henüz geçmiş kayıt yok.</div>}</div>}
