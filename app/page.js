@@ -19,8 +19,8 @@ function Stepper({value,step=1,onChange,suffix=""}){
 
 function Exercise({ex,index,expanded,onToggle,workoutId,reload,onNeedWorkout}){
  const isBodyweight=ex.virtual===true;
- const isBarbell=/barbell/i.test(ex.name);
- const increment=isBarbell?2.5:Number(ex.increment_kg||0);
+ const usesFixedStep=/(barbell|dumbbell)/i.test(ex.name);
+ const increment=usesFixedStep?2.5:Number(ex.increment_kg||0);
  const [kg,setKg]=useState(Number(ex.last_weight??ex.default_weight??0));
  const [saved,setSaved]=useState(false); const [busy,setBusy]=useState(false);
  const [historyOpen,setHistoryOpen]=useState(false); const [history,setHistory]=useState([]); const [historyBusy,setHistoryBusy]=useState(false);
