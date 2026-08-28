@@ -17,9 +17,16 @@ function Stepper({value,step=1,onChange,suffix=""}){
 }
 
 function Login({done}){
- const [email,setEmail]=useState(""); const [password,setPassword]=useState(""); const [signup,setSignup]=useState(false); const [msg,setMsg]=useState("");
- async function go(){setMsg(""); const r=signup?await supabase.auth.signUp({email,password}):await supabase.auth.signInWithPassword({email,password}); if(r.error)setMsg(r.error.message); else if(r.data.session)done(r.data.session); else setMsg("Hesap oluşturuldu. E-posta doğrulaması gerekiyorsa gelen kutunu kontrol et.");}
- return <main className="login"><section><div className="logo"><Dumbbell/></div><h1>Workout</h1><p>Ağırlıklarını ve gelişimini tek yerde tut.</p><input placeholder="E-posta" value={email} onChange={e=>setEmail(e.target.value)}/><input type="password" placeholder="Şifre" value={password} onChange={e=>setPassword(e.target.value)}/><button className="primary" onClick={go}>{signup?"Hesap Oluştur":"Giriş Yap"}</button><button className="link" onClick={()=>setSignup(!signup)}>{signup?"Zaten hesabım var":"İlk kullanım — hesap oluştur"}</button>{msg&&<p className="msg">{msg}</p>}</section></main>
+ const [email,setEmail]=useState(""); const [password,setPassword]=useState(""); const [signup,setSignup]=useState(false); const [msg,setMsg]=useState(""); const [busy,setBusy]=useState(false);
+ async function go(){setMsg("");setBusy(true);const r=signup?await supabase.auth.signUp({email,password}):await supabase.auth.signInWithPassword({email,password});setBusy(false);if(r.error)setMsg(r.error.message);else if(r.data.session)done(r.data.session);else setMsg("Hesap oluşturuldu. E-posta doğrulaması gerekiyorsa gelen kutunu kontrol et.");}
+ async function resetPassword(){
+   if(!email){setMsg("Önce e-posta adresini yaz.");return;}
+   setBusy(true);setMsg("");
+   const {error}=await supabase.auth.resetPasswordForEmail(email,{redirectTo:window.location.origin});
+   setBusy(false);
+   if(error)setMsg(error.message);else setMsg("Şifre yenileme bağlantısını e-postana gönderdim.");
+ }
+ return <main className="login"><section><div className="logo"><Dumbbell/></div><h1>Workout</h1><p>Ağırlıklarını ve gelişimini tek yerde tut.</p><input placeholder="E-posta" value={email} onChange={e=>setEmail(e.target.value)}/><input type="password" placeholder="Şifre" value={password} onChange={e=>setPassword(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")go()}}/><button className="primary" onClick={go} disabled={busy}>{busy?"Bekle…":signup?"Hesap Oluştur":"Giriş Yap"}</button>{!signup&&<button className="link" onClick={resetPassword} disabled={busy}>Şifremi unuttum</button>}<button className="link" onClick={()=>setSignup(!signup)}>{signup?"Zaten hesabım var":"İlk kullanım — hesap oluştur"}</button>{msg&&<p className="msg">{msg}</p>}</section></main>
 }
 
 function Exercise({ex,index,expanded,onToggle,workoutId,reload,onNeedWorkout}){
