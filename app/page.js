@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
-import { Minus, Plus, Save, Dumbbell, LogOut, ChevronDown, Check, Play, Flag, TrendingUp, History } from "lucide-react";
+import { Minus, Plus, Save, Dumbbell, ChevronDown, Check, Play, Flag, TrendingUp, History } from "lucide-react";
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+const ANON_USER_ID = "00000000-0000-0000-0000-000000000001";
 const DAYS=[{n:1,t:"Göğüs + Arka Kol"},{n:2,t:"Sırt + Ön Kol"},{n:3,t:"Omuz + Bacak"}];
 
 const DISPLAY_NAMES={
@@ -14,19 +15,6 @@ const DISPLAY_NAMES={
 
 function Stepper({value,step=1,onChange,suffix=""}){
   return <div className="stepper"><button onClick={()=>onChange(Math.max(0,+(Number(value)-step).toFixed(2)))} aria-label="Azalt"><Minus/></button><div><b>{value}</b><small>{suffix}</small></div><button onClick={()=>onChange(+(Number(value)+step).toFixed(2))} aria-label="Artır"><Plus/></button></div>
-}
-
-function Login({done}){
- const [email,setEmail]=useState(""); const [password,setPassword]=useState(""); const [signup,setSignup]=useState(false); const [msg,setMsg]=useState(""); const [busy,setBusy]=useState(false);
- async function go(){setMsg("");setBusy(true);const r=signup?await supabase.auth.signUp({email,password}):await supabase.auth.signInWithPassword({email,password});setBusy(false);if(r.error)setMsg(r.error.message);else if(r.data.session)done(r.data.session);else setMsg("Hesap oluşturuldu. E-posta doğrulaması gerekiyorsa gelen kutunu kontrol et.");}
- async function resetPassword(){
-   if(!email){setMsg("Önce e-posta adresini yaz.");return;}
-   setBusy(true);setMsg("");
-   const {error}=await supabase.auth.resetPasswordForEmail(email,{redirectTo:window.location.origin});
-   setBusy(false);
-   if(error)setMsg(error.message);else setMsg("Şifre yenileme bağlantısını e-postana gönderdim.");
- }
- return <main className="login"><section><div className="logo"><Dumbbell/></div><h1>Workout</h1><p>Ağırlıklarını ve gelişimini tek yerde tut.</p><input placeholder="E-posta" value={email} onChange={e=>setEmail(e.target.value)}/><input type="password" placeholder="Şifre" value={password} onChange={e=>setPassword(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")go()}}/><button className="primary" onClick={go} disabled={busy}>{busy?"Bekle…":signup?"Hesap Oluştur":"Giriş Yap"}</button>{!signup&&<button className="link" onClick={resetPassword} disabled={busy}>Şifremi unuttum</button>}<button className="link" onClick={()=>setSignup(!signup)}>{signup?"Zaten hesabım var":"İlk kullanım — hesap oluştur"}</button>{msg&&<p className="msg">{msg}</p>}</section></main>
 }
 
 function Exercise({ex,index,expanded,onToggle,workoutId,reload,onNeedWorkout}){
@@ -42,10 +30,9 @@ function Exercise({ex,index,expanded,onToggle,workoutId,reload,onNeedWorkout}){
  async function save(){
    if(isBodyweight)return;
    setBusy(true);let wid=workoutId;if(!wid)wid=await onNeedWorkout();if(!wid){setBusy(false);return;}
-   const {data:{user}}=await supabase.auth.getUser();
    await supabase.from("workout_sets").delete().eq("workout_id",wid).eq("exercise_id",ex.id);
    const reps=(ex.last_reps?.length?ex.last_reps:[12,12,12]);
-   const rows=reps.map((r,i)=>({user_id:user.id,workout_id:wid,exercise_id:ex.id,set_no:i+1,weight_kg:kg,reps:r}));
+   const rows=reps.map((r,i)=>({user_id:ANON_USER_ID,workout_id:wid,exercise_id:ex.id,set_no:i+1,weight_kg:kg,reps:r}));
    const q=await supabase.from("workout_sets").insert(rows);
    if(q.error)alert(q.error.message); else {setSaved(true);setHistory([]);await reload();}
    setBusy(false);
@@ -90,7 +77,7 @@ function Exercise({ex,index,expanded,onToggle,workoutId,reload,onNeedWorkout}){
 function DayCard({day,items,reload}){
  const [expanded,setExpanded]=useState(null); const [workoutId,setWorkoutId]=useState(null); const [startedAt,setStartedAt]=useState(null);
  useEffect(()=>{const raw=typeof window!=="undefined"?localStorage.getItem(`active-workout-${day.n}`):null;if(raw){try{const x=JSON.parse(raw);setWorkoutId(x.id);setStartedAt(x.startedAt)}catch{}}},[day.n]);
- async function ensureWorkout(){if(workoutId)return workoutId;const {data:{user}}=await supabase.auth.getUser();const w=await supabase.from("workouts").insert({user_id:user.id,workout_day:day.n}).select("id,performed_at").single();if(w.error){alert(w.error.message);return null;}setWorkoutId(w.data.id);setStartedAt(w.data.performed_at);localStorage.setItem(`active-workout-${day.n}`,JSON.stringify({id:w.data.id,startedAt:w.data.performed_at}));return w.data.id;}
+ async function ensureWorkout(){if(workoutId)return workoutId;const w=await supabase.from("workouts").insert({user_id:ANON_USER_ID,workout_day:day.n}).select("id,performed_at").single();if(w.error){alert(w.error.message);return null;}setWorkoutId(w.data.id);setStartedAt(w.data.performed_at);localStorage.setItem(`active-workout-${day.n}`,JSON.stringify({id:w.data.id,startedAt:w.data.performed_at}));return w.data.id;}
  function finishWorkout(){localStorage.removeItem(`active-workout-${day.n}`);setWorkoutId(null);setStartedAt(null);setExpanded(null);reload();}
  const visibleItems = day.n===1 ? items.flatMap(ex=>{
    const renamed={...ex,name:DISPLAY_NAMES[ex.name]||ex.name};
@@ -105,10 +92,13 @@ function DayCard({day,items,reload}){
 }
 
 export default function Home(){
- const [session,setSession]=useState(null),[loading,setLoading]=useState(true),[daysData,setDaysData]=useState({1:[],2:[],3:[]});
- useEffect(()=>{supabase.auth.getSession().then(({data})=>{setSession(data.session);setLoading(false)});const {data}=supabase.auth.onAuthStateChange((_,s)=>setSession(s));return()=>data.subscription.unsubscribe()},[]);
- async function load(){if(!session)return;const rs=await Promise.all(DAYS.map(d=>supabase.rpc("get_exercises_with_last_session",{p_day_no:d.n})));const next={};DAYS.forEach((d,i)=>next[d.n]=rs[i].error?[]:(rs[i].data||[]));setDaysData(next)}
- useEffect(()=>{load()},[session]);
- if(loading)return <main className="center">Yükleniyor…</main>; if(!session)return <Login done={setSession}/>;
- return <main className="shell"><header><div><small>WORKOUT TRACKER</small><h1>Programım</h1></div><button className="icon" onClick={()=>supabase.auth.signOut()}><LogOut/></button></header><p className="intro">Bugünkü gücün, dünkü kaydın üzerine kurulur.</p><div className="days-list">{DAYS.map(d=><DayCard key={d.n} day={d} items={daysData[d.n]} reload={load}/>)}</div></main>
+ const [loading,setLoading]=useState(true),[daysData,setDaysData]=useState({1:[],2:[],3:[]});
+ async function load(){
+   const rs=await Promise.all(DAYS.map(d=>supabase.rpc("get_exercises_with_last_session",{p_day_no:d.n,p_user_id:ANON_USER_ID})));
+   const next={};DAYS.forEach((d,i)=>next[d.n]=rs[i].error?[]:(rs[i].data||[]));
+   setDaysData(next);setLoading(false);
+ }
+ useEffect(()=>{load()},[]);
+ if(loading)return <main className="center">Yükleniyor…</main>;
+ return <main className="shell"><header><div><small>WORKOUT TRACKER</small><h1>Programım</h1></div></header><p className="intro">Bugünkü gücün, dünkü kaydın üzerine kurulur.</p><div className="days-list">{DAYS.map(d=><DayCard key={d.n} day={d} items={daysData[d.n]} reload={load}/>)}</div></main>
 }
