@@ -26,9 +26,9 @@ const supabase = isSupabaseConfigured
 const ANON_USER_ID = "00000000-0000-0000-0000-000000000001";
 
 const DAYS = [
-  { n: 1, t: "Göğüs + Arka Kol + Karın", short: "1. Gün: Göğüs & Kol" },
-  { n: 2, t: "Sırt + Ön Kol + Karın", short: "2. Gün: Sırt & Kol" },
-  { n: 3, t: "Bacak + Omuz + Karın", short: "3. Gün: Bacak & Omuz" }
+  { n: 1, t: "Göğüs + Arka Kol + Karın", short: "Göğüs & Kol" },
+  { n: 2, t: "Sırt + Ön Kol + Karın", short: "Sırt & Kol" },
+  { n: 3, t: "Bacak + Omuz + Karın", short: "Bacak & Omuz" }
 ];
 
 const DISPLAY_NAMES = {
