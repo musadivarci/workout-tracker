@@ -47,7 +47,7 @@ insert into exercises(day_no, sort_order, name, increment_kg, default_weight) va
 (1, 1, 'Dumbbell Bench Press', 2.5, 20),
 (1, 2, 'Incline Barbell Bench Press', 2.5, 35),
 (1, 3, 'Smith Machine Dips', 2.5, 0),
-(1, 4, 'Pectoral Fly', 2.5, 30),
+(1, 4, 'Dumbbell Fly', 2.5, 12.5),
 (1, 5, 'Cable Pushdown', 2.5, 25),
 (1, 6, 'Dumbbell Kickback', 2.5, 7.5),
 (1, 7, 'Şınav', 0, 0),

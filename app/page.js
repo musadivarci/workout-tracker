@@ -46,7 +46,7 @@ const DAYS = [
 const DISPLAY_NAMES = {
   "Barbell Bench Press": "Dumbbell Bench Press",
   "Dips": "Smith Machine Dips",
-  "Dumbbell Fly": "Pectoral Fly"
+  "Pectoral Fly": "Dumbbell Fly"
 };
 
 // Exact 3-day program template (used to match ordering & meta)
@@ -55,7 +55,7 @@ const DEFAULT_EXERCISES = {
     { id: "ex-1-1", day_no: 1, sort_order: 1, name: "Dumbbell Bench Press", increment_kg: 2.5, default_weight: 20 },
     { id: "ex-1-2", day_no: 1, sort_order: 2, name: "Incline Barbell Bench Press", increment_kg: 2.5, default_weight: 35 },
     { id: "ex-1-3", day_no: 1, sort_order: 3, name: "Smith Machine Dips", increment_kg: 2.5, default_weight: 0 },
-    { id: "ex-1-4", day_no: 1, sort_order: 4, name: "Pectoral Fly", increment_kg: 2.5, default_weight: 30 },
+    { id: "ex-1-4", day_no: 1, sort_order: 4, name: "Dumbbell Fly", increment_kg: 2.5, default_weight: 12.5 },
     { id: "ex-1-5", day_no: 1, sort_order: 5, name: "Cable Pushdown", increment_kg: 2.5, default_weight: 25 },
     { id: "ex-1-6", day_no: 1, sort_order: 6, name: "Dumbbell Kickback", increment_kg: 2.5, default_weight: 7.5 },
     { id: "ex-1-7", day_no: 1, sort_order: 7, name: "Şınav", virtual: true, note: "Antrenman sonu göğüs ve triceps bitiricisi (RPE 10 / Tükenişe kadar)", increment_kg: 0, last_weight: null },
