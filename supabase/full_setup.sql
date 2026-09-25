@@ -49,7 +49,7 @@ insert into exercises(day_no, sort_order, name, increment_kg, default_weight) va
 (1, 3, 'Smith Machine Dips', 2.5, 0),
 (1, 4, 'Dumbbell Fly', 2.5, 12.5),
 (1, 5, 'Cable Pushdown', 2.5, 25),
-(1, 6, 'Dumbbell Kickback', 2.5, 7.5),
+(1, 6, 'Lying Triceps Extension', 2.5, 15),
 (1, 7, 'Şınav', 0, 0),
 (1, 8, 'Mekik (Crunch)', 0, 0),
 
@@ -63,7 +63,7 @@ insert into exercises(day_no, sort_order, name, increment_kg, default_weight) va
 (2, 7, 'Asılı Diz Çekme (Hanging Knee Raise)', 0, 0),
 
 -- GÜN 3: Bacak + Omuz + Karın
-(3, 1, 'Dumbbell Squat', 2.5, 20),
+(3, 1, 'Leg Press', 2.5, 60),
 (3, 2, 'Dumbbell Lunges', 2.5, 12.5),
 (3, 3, 'Leg Extension', 2.5, 35),
 (3, 4, 'Leg Curl', 2.5, 30),
