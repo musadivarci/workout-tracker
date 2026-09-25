@@ -75,18 +75,19 @@ function getDayExercises(dayNo, items) {
   const defaults = DEFAULT_EXERCISES[dayNo] || [];
   if (!items || items.length === 0) return defaults;
 
-  // Map server items to default structure or fill missing properties
+  // Map server items to default structure, preserving real database UUID
   return defaults.map((def, idx) => {
     const matched = items.find(it => 
       it.id === def.id || 
-      it.name?.toLowerCase() === def.name?.toLowerCase() ||
-      DISPLAY_NAMES[it.name]?.toLowerCase() === def.name?.toLowerCase()
+      it.name?.trim().toLowerCase() === def.name?.trim().toLowerCase() ||
+      DISPLAY_NAMES[it.name]?.trim().toLowerCase() === def.name?.trim().toLowerCase()
     );
     if (matched) {
       return {
         ...def,
-        last_weight: matched.last_weight ?? def.default_weight,
-        previous_weight: matched.previous_weight,
+        id: matched.id || def.id, // Preserves the real database UUID from Supabase
+        last_weight: matched.last_weight != null ? Number(matched.last_weight) : def.default_weight,
+        previous_weight: matched.previous_weight != null ? Number(matched.previous_weight) : undefined,
         last_increase_at: matched.last_increase_at
       };
     }
@@ -150,17 +151,35 @@ function Exercise({ ex, index, expanded, onToggle, workoutId, reload, onNeedWork
 
     try {
       if (supabase) {
-        await supabase.from("workout_sets").delete().eq("workout_id", wid).eq("exercise_id", ex.id);
-        const reps = ex.last_reps?.length ? ex.last_reps : [12, 12, 12];
-        const rows = reps.map((r, i) => ({
-          user_id: ANON_USER_ID,
-          workout_id: wid,
-          exercise_id: ex.id,
-          set_no: i + 1,
-          weight_kg: saveKg,
-          reps: r
-        }));
-        await supabase.from("workout_sets").insert(rows);
+        // If ex.id is a temporary fake string, find or insert exercise in Supabase
+        let validExerciseId = ex.id;
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(ex.id);
+        
+        if (!isUuid) {
+          // Look up real UUID from exercises table by name
+          const lookup = await supabase.from("exercises").select("id").ilike("name", ex.name).limit(1);
+          if (lookup.data && lookup.data[0]?.id) {
+            validExerciseId = lookup.data[0].id;
+          }
+        }
+
+        if (isUuid || validExerciseId !== ex.id) {
+          await supabase.from("workout_sets").delete().eq("workout_id", wid).eq("exercise_id", validExerciseId);
+          const reps = ex.last_reps?.length ? ex.last_reps : [12, 12, 12];
+          const rows = reps.map((r, i) => ({
+            user_id: ANON_USER_ID,
+            workout_id: wid,
+            exercise_id: validExerciseId,
+            set_no: i + 1,
+            weight_kg: saveKg,
+            reps: r
+          }));
+          const insertRes = await supabase.from("workout_sets").insert(rows);
+          if (insertRes.error) {
+            console.error("Supabase insert error:", insertRes.error);
+            alert("Veritabanı kayıt hatası: " + insertRes.error.message);
+          }
+        }
       }
 
       // Save to local storage cache
@@ -187,6 +206,7 @@ function Exercise({ ex, index, expanded, onToggle, workoutId, reload, onNeedWork
       await reload();
     } catch (err) {
       console.error("Save error:", err);
+      alert("Hata: " + (err.message || err));
     } finally {
       setBusy(false);
     }
