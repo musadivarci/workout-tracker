@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { 
   Minus, 
@@ -14,8 +14,10 @@ import {
   Zap,
   RefreshCw,
   Cloud,
-  CloudOff,
-  AlertCircle
+  AlertTriangle,
+  RotateCcw,
+  ExternalLink,
+  ShieldCheck
 } from "lucide-react";
 
 // Check for valid Supabase credentials
@@ -47,37 +49,37 @@ const DISPLAY_NAMES = {
   "Dumbbell Fly": "Pectoral Fly"
 };
 
-// Exact 3-day program specified by user
+// Exact 3-day program template (used to match ordering & meta)
 const DEFAULT_EXERCISES = {
   1: [
-    { id: "ex-1-1", day_no: 1, sort_order: 1, name: "Dumbbell Bench Press", increment_kg: 2.5, default_weight: 20, last_weight: 20 },
-    { id: "ex-1-2", day_no: 1, sort_order: 2, name: "Incline Barbell Bench Press", increment_kg: 2.5, default_weight: 35, last_weight: 35 },
-    { id: "ex-1-3", day_no: 1, sort_order: 3, name: "Smith Machine Dips", increment_kg: 2.5, default_weight: 0, last_weight: 0 },
-    { id: "ex-1-4", day_no: 1, sort_order: 4, name: "Pectoral Fly", increment_kg: 2.5, default_weight: 30, last_weight: 30 },
-    { id: "ex-1-5", day_no: 1, sort_order: 5, name: "Cable Pushdown", increment_kg: 2.5, default_weight: 25, last_weight: 25 },
-    { id: "ex-1-6", day_no: 1, sort_order: 6, name: "Dumbbell Kickback", increment_kg: 2.5, default_weight: 7.5, last_weight: 7.5 },
+    { id: "ex-1-1", day_no: 1, sort_order: 1, name: "Dumbbell Bench Press", increment_kg: 2.5, default_weight: 20 },
+    { id: "ex-1-2", day_no: 1, sort_order: 2, name: "Incline Barbell Bench Press", increment_kg: 2.5, default_weight: 35 },
+    { id: "ex-1-3", day_no: 1, sort_order: 3, name: "Smith Machine Dips", increment_kg: 2.5, default_weight: 0 },
+    { id: "ex-1-4", day_no: 1, sort_order: 4, name: "Pectoral Fly", increment_kg: 2.5, default_weight: 30 },
+    { id: "ex-1-5", day_no: 1, sort_order: 5, name: "Cable Pushdown", increment_kg: 2.5, default_weight: 25 },
+    { id: "ex-1-6", day_no: 1, sort_order: 6, name: "Dumbbell Kickback", increment_kg: 2.5, default_weight: 7.5 },
     { id: "ex-1-7", day_no: 1, sort_order: 7, name: "Şınav", virtual: true, note: "Antrenman sonu göğüs ve triceps bitiricisi (RPE 10 / Tükenişe kadar)", increment_kg: 0, last_weight: null },
     { id: "ex-1-8", day_no: 1, sort_order: 8, name: "Mekik (Crunch)", virtual: true, note: "3 set x 12-15 tekrar kontrollü tempo", increment_kg: 0, last_weight: null }
   ],
   2: [
-    { id: "ex-2-1", day_no: 2, sort_order: 1, name: "Lat Pulldown", increment_kg: 2.5, default_weight: 45, last_weight: 45 },
-    { id: "ex-2-2", day_no: 2, sort_order: 2, name: "Close Grip Pulldown", increment_kg: 2.5, default_weight: 40, last_weight: 40 },
-    { id: "ex-2-3", day_no: 2, sort_order: 3, name: "Cable Row", increment_kg: 2.5, default_weight: 40, last_weight: 40 },
-    { id: "ex-2-4", day_no: 2, sort_order: 4, name: "Lower Back Extension", increment_kg: 2.5, default_weight: 10, last_weight: 10 },
-    { id: "ex-2-5", day_no: 2, sort_order: 5, name: "Barbell Curl", increment_kg: 2.5, default_weight: 20, last_weight: 20 },
-    { id: "ex-2-6", day_no: 2, sort_order: 6, name: "Dumbbell Hammer Curl", increment_kg: 2.5, default_weight: 10, last_weight: 10 },
+    { id: "ex-2-1", day_no: 2, sort_order: 1, name: "Lat Pulldown", increment_kg: 2.5, default_weight: 45 },
+    { id: "ex-2-2", day_no: 2, sort_order: 2, name: "Close Grip Pulldown", increment_kg: 2.5, default_weight: 40 },
+    { id: "ex-2-3", day_no: 2, sort_order: 3, name: "Cable Row", increment_kg: 2.5, default_weight: 40 },
+    { id: "ex-2-4", day_no: 2, sort_order: 4, name: "Lower Back Extension", increment_kg: 2.5, default_weight: 10 },
+    { id: "ex-2-5", day_no: 2, sort_order: 5, name: "Barbell Curl", increment_kg: 2.5, default_weight: 20 },
+    { id: "ex-2-6", day_no: 2, sort_order: 6, name: "Dumbbell Hammer Curl", increment_kg: 2.5, default_weight: 10 },
     { id: "ex-2-7", day_no: 2, sort_order: 7, name: "Asılı Diz Çekme (Hanging Knee Raise)", virtual: true, note: "3 set x 12-15 tekrar veya Crunch", increment_kg: 0, last_weight: null }
   ],
   3: [
-    { id: "ex-3-1", day_no: 3, sort_order: 1, name: "Dumbbell Squat", increment_kg: 2.5, default_weight: 20, last_weight: 20 },
-    { id: "ex-3-2", day_no: 3, sort_order: 2, name: "Dumbbell Lunges", increment_kg: 2.5, default_weight: 12.5, last_weight: 12.5 },
-    { id: "ex-3-3", day_no: 3, sort_order: 3, name: "Leg Extension", increment_kg: 2.5, default_weight: 35, last_weight: 35 },
-    { id: "ex-3-4", day_no: 3, sort_order: 4, name: "Leg Curl", increment_kg: 2.5, default_weight: 30, last_weight: 30 },
-    { id: "ex-3-5", day_no: 3, sort_order: 5, name: "Adductor Machine", increment_kg: 2.5, default_weight: 35, last_weight: 35 },
-    { id: "ex-3-6", day_no: 3, sort_order: 6, name: "Dumbbell Shoulder Press", increment_kg: 2.5, default_weight: 15, last_weight: 15 },
-    { id: "ex-3-7", day_no: 3, sort_order: 7, name: "Dumbbell Lateral Raise", increment_kg: 2.5, default_weight: 7.5, last_weight: 7.5 },
-    { id: "ex-3-8", day_no: 3, sort_order: 8, name: "Face Pull", increment_kg: 2.5, default_weight: 25, last_weight: 25 },
-    { id: "ex-3-9", day_no: 3, sort_order: 9, name: "Shrugs", increment_kg: 2.5, default_weight: 20, last_weight: 20 }
+    { id: "ex-3-1", day_no: 3, sort_order: 1, name: "Dumbbell Squat", increment_kg: 2.5, default_weight: 20 },
+    { id: "ex-3-2", day_no: 3, sort_order: 2, name: "Dumbbell Lunges", increment_kg: 2.5, default_weight: 12.5 },
+    { id: "ex-3-3", day_no: 3, sort_order: 3, name: "Leg Extension", increment_kg: 2.5, default_weight: 35 },
+    { id: "ex-3-4", day_no: 3, sort_order: 4, name: "Leg Curl", increment_kg: 2.5, default_weight: 30 },
+    { id: "ex-3-5", day_no: 3, sort_order: 5, name: "Adductor Machine", increment_kg: 2.5, default_weight: 35 },
+    { id: "ex-3-6", day_no: 3, sort_order: 6, name: "Dumbbell Shoulder Press", increment_kg: 2.5, default_weight: 15 },
+    { id: "ex-3-7", day_no: 3, sort_order: 7, name: "Dumbbell Lateral Raise", increment_kg: 2.5, default_weight: 7.5 },
+    { id: "ex-3-8", day_no: 3, sort_order: 8, name: "Face Pull", increment_kg: 2.5, default_weight: 25 },
+    { id: "ex-3-9", day_no: 3, sort_order: 9, name: "Shrugs", increment_kg: 2.5, default_weight: 20 }
   ]
 };
 
@@ -106,7 +108,7 @@ function getDayExercises(dayNo, items) {
 }
 
 // Single Exercise Row Component
-function Exercise({ ex, index, expanded, onToggle, workoutId, reload, onNeedWorkout, isOnline }) {
+function Exercise({ ex, index, expanded, onToggle, workoutId, reload, onNeedWorkout }) {
   const isBodyweight = ex.virtual === true;
   const isBarbell = /barbell/i.test(ex.name);
   const isDumbbell = /dumbbell/i.test(ex.name);
@@ -146,95 +148,79 @@ function Exercise({ ex, index, expanded, onToggle, workoutId, reload, onNeedWork
 
   async function save() {
     if (isBodyweight) return;
+    if (!supabase) {
+      alert("❌ Veritabanı bağlantısı yok! Lütfen Vercel Supabase ayarlarını yapın.");
+      return;
+    }
+
     const saveKg = isDumbbell ? Math.max(0, Math.round(Number(kg) / 2.5) * 2.5) : kg;
     if (saveKg !== kg) setKg(saveKg);
 
     setBusy(true);
-    let wid = workoutId;
-    if (!wid) {
-      wid = await onNeedWorkout();
-    }
-    if (!wid) {
-      setBusy(false);
-      return;
-    }
 
     try {
-      if (supabase) {
-        // 1. Ensure exercise exists with real UUID in Supabase
-        let validExerciseId = ex.id;
-        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(ex.id);
-        
-        if (!isUuid) {
-          const lookup = await supabase.from("exercises").select("id").ilike("name", ex.name).limit(1);
-          if (lookup.data && lookup.data[0]?.id) {
-            validExerciseId = lookup.data[0].id;
-          } else {
-            const insEx = await supabase.from("exercises").insert({
-              day_no: ex.day_no || 1,
-              sort_order: ex.sort_order || 1,
-              name: ex.name,
-              increment_kg: ex.increment_kg || 2.5,
-              default_weight: ex.default_weight || 0
-            }).select("id").single();
-            if (insEx.data?.id) {
-              validExerciseId = insEx.data.id;
-            }
-          }
-        }
+      let wid = workoutId;
+      if (!wid) {
+        wid = await onNeedWorkout();
+      }
+      if (!wid) {
+        throw new Error("Antrenman başlatılamadı. Veritabanına ulaşılamıyor.");
+      }
 
-        // 2. Ensure workout_id is a valid UUID
-        let validWorkoutId = wid;
-        const isWorkoutUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(wid);
-        if (!isWorkoutUuid) {
-          const newWorkout = await supabase.from("workouts").insert({
-            user_id: ANON_USER_ID,
-            workout_day: ex.day_no || 1
+      // 1. Ensure exercise exists with real UUID in Supabase
+      let validExerciseId = ex.id;
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(ex.id);
+      
+      if (!isUuid) {
+        const lookup = await supabase.from("exercises").select("id").ilike("name", ex.name).limit(1);
+        if (lookup.data && lookup.data[0]?.id) {
+          validExerciseId = lookup.data[0].id;
+        } else {
+          const insEx = await supabase.from("exercises").insert({
+            day_no: ex.day_no || 1,
+            sort_order: ex.sort_order || 1,
+            name: ex.name,
+            increment_kg: ex.increment_kg || 2.5,
+            default_weight: ex.default_weight || 0
           }).select("id").single();
-          if (newWorkout.data?.id) {
-            validWorkoutId = newWorkout.data.id;
-          }
-        }
-
-        // 3. Save sets to Supabase
-        const isReadyUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(validExerciseId);
-        const isReadyWorkout = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(validWorkoutId);
-
-        if (isReadyUuid && isReadyWorkout) {
-          await supabase.from("workout_sets").delete().eq("workout_id", validWorkoutId).eq("exercise_id", validExerciseId);
-          const reps = ex.last_reps?.length ? ex.last_reps : [12, 12, 12];
-          const rows = reps.map((r, i) => ({
-            user_id: ANON_USER_ID,
-            workout_id: validWorkoutId,
-            exercise_id: validExerciseId,
-            set_no: i + 1,
-            weight_kg: saveKg,
-            reps: r
-          }));
-          const insertRes = await supabase.from("workout_sets").insert(rows);
-          if (insertRes.error) {
-            console.error("Supabase insert error:", insertRes.error);
-            alert("Bulut Veritabanı Hatası: " + insertRes.error.message + "\n(Lütfen Supabase tablosunun açık olduğundan emin olun.)");
+          if (insEx.data?.id) {
+            validExerciseId = insEx.data.id;
+          } else {
+            throw new Error("Egzersiz veritabanında bulunamadı: " + (insEx.error?.message || ""));
           }
         }
       }
 
-      // Always update local cache for instant feedback & offline fallback
-      if (typeof window !== "undefined") {
-        const stored = localStorage.getItem("workout-local-data");
-        const cache = stored ? JSON.parse(stored) : {};
-        cache[ex.id] = {
-          last_weight: saveKg,
-          previous_weight: ex.last_weight || saveKg,
-          updated_at: new Date().toISOString()
-        };
-        localStorage.setItem("workout-local-data", JSON.stringify(cache));
+      // 2. Ensure workout_id is a valid UUID
+      let validWorkoutId = wid;
+      const isWorkoutUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(wid);
+      if (!isWorkoutUuid) {
+        const newWorkout = await supabase.from("workouts").insert({
+          user_id: ANON_USER_ID,
+          workout_day: ex.day_no || 1
+        }).select("id").single();
+        if (newWorkout.data?.id) {
+          validWorkoutId = newWorkout.data.id;
+        } else {
+          throw new Error("Antrenman oturumu oluşturulamadı: " + (newWorkout.error?.message || ""));
+        }
+      }
 
-        const histKey = `history-${ex.id}`;
-        const histRaw = localStorage.getItem(histKey);
-        const histArr = histRaw ? JSON.parse(histRaw) : [];
-        histArr.unshift({ workout_id: wid, weight_kg: saveKg, created_at: new Date().toISOString() });
-        localStorage.setItem(histKey, JSON.stringify(histArr.slice(0, 10)));
+      // 3. Save sets strictly to Supabase (NO localStorage)
+      await supabase.from("workout_sets").delete().eq("workout_id", validWorkoutId).eq("exercise_id", validExerciseId);
+      const reps = ex.last_reps?.length ? ex.last_reps : [12, 12, 12];
+      const rows = reps.map((r, i) => ({
+        user_id: ANON_USER_ID,
+        workout_id: validWorkoutId,
+        exercise_id: validExerciseId,
+        set_no: i + 1,
+        weight_kg: saveKg,
+        reps: r
+      }));
+      
+      const insertRes = await supabase.from("workout_sets").insert(rows);
+      if (insertRes.error) {
+        throw new Error(insertRes.error.message);
       }
 
       setSaved(true);
@@ -242,7 +228,7 @@ function Exercise({ ex, index, expanded, onToggle, workoutId, reload, onNeedWork
       await reload();
     } catch (err) {
       console.error("Save error:", err);
-      alert("Kayıt hatası: " + (err.message || err));
+      alert("❌ Kayıt Veritabanına İletilemedi!\n" + (err.message || err));
     } finally {
       setBusy(false);
     }
@@ -256,46 +242,36 @@ function Exercise({ ex, index, expanded, onToggle, workoutId, reload, onNeedWork
     setHistoryOpen(true);
     if (history.length) return;
 
+    if (!supabase) return;
+
     setHistoryBusy(true);
     try {
-      if (supabase) {
-        let targetId = ex.id;
-        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(ex.id);
-        if (!isUuid) {
-          const lookup = await supabase.from("exercises").select("id").ilike("name", ex.name).limit(1);
-          if (lookup.data && lookup.data[0]?.id) {
-            targetId = lookup.data[0].id;
-          }
-        }
-
-        const q = await supabase
-          .from("workout_sets")
-          .select("workout_id,weight_kg,created_at")
-          .eq("exercise_id", targetId)
-          .order("created_at", { ascending: false })
-          .limit(36);
-
-        if (!q.error && q.data && q.data.length > 0) {
-          const seen = new Set();
-          const rows = [];
-          for (const r of q.data) {
-            if (seen.has(r.workout_id)) continue;
-            seen.add(r.workout_id);
-            rows.push(r);
-            if (rows.length === 6) break;
-          }
-          setHistory(rows);
-          setHistoryBusy(false);
-          return;
+      let targetId = ex.id;
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(ex.id);
+      if (!isUuid) {
+        const lookup = await supabase.from("exercises").select("id").ilike("name", ex.name).limit(1);
+        if (lookup.data && lookup.data[0]?.id) {
+          targetId = lookup.data[0].id;
         }
       }
 
-      if (typeof window !== "undefined") {
-        const histKey = `history-${ex.id}`;
-        const histRaw = localStorage.getItem(histKey);
-        if (histRaw) {
-          setHistory(JSON.parse(histRaw));
+      const q = await supabase
+        .from("workout_sets")
+        .select("workout_id,weight_kg,created_at")
+        .eq("exercise_id", targetId)
+        .order("created_at", { ascending: false })
+        .limit(36);
+
+      if (!q.error && q.data && q.data.length > 0) {
+        const seen = new Set();
+        const rows = [];
+        for (const r of q.data) {
+          if (seen.has(r.workout_id)) continue;
+          seen.add(r.workout_id);
+          rows.push(r);
+          if (rows.length === 6) break;
         }
+        setHistory(rows);
       }
     } catch (err) {
       console.error("History fetch error:", err);
@@ -346,7 +322,7 @@ function Exercise({ ex, index, expanded, onToggle, workoutId, reload, onNeedWork
                     : `Artış adımı: ${increment} kg`}
                 </span>
                 {saved ? (
-                  <span className="stat-tag done"><Check size={12} /> Kaydedildi</span>
+                  <span className="stat-tag done"><Check size={12} /> Buluta Kaydedildi</span>
                 ) : (
                   pct > 0 && <span className="stat-tag progression"><TrendingUp size={12} /> +%{pct}</span>
                 )}
@@ -398,7 +374,7 @@ function Exercise({ ex, index, expanded, onToggle, workoutId, reload, onNeedWork
               {historyOpen && (
                 <div className="history-panel">
                   {historyBusy ? (
-                    <div className="history-empty">Geçmiş veriler yükleniyor…</div>
+                    <div className="history-empty">Buluttan geçmiş kayıtlar çekiliyor…</div>
                   ) : history.length ? (
                     history.map((r, i) => (
                       <div className="history-item" key={`${r.workout_id}-${i}`}>
@@ -422,11 +398,11 @@ function Exercise({ ex, index, expanded, onToggle, workoutId, reload, onNeedWork
               >
                 {saved ? (
                   <>
-                    <Check size={18} /> Kaydedildi & Senkronize Edildi
+                    <Check size={18} /> Kaydedildi (Bulut Senkron)
                   </>
                 ) : (
                   <>
-                    <Zap size={18} /> {busy ? "Kaydediliyor…" : "Seti Kaydet"}
+                    <Zap size={18} /> {busy ? "Buluta Kaydediliyor…" : "Seti Kaydet"}
                   </>
                 )}
               </button>
@@ -439,7 +415,7 @@ function Exercise({ ex, index, expanded, onToggle, workoutId, reload, onNeedWork
 }
 
 // Day Section Component
-function DayView({ day, items, reload, activeWorkoutId, onStartWorkout, onFinishWorkout, startedAt, isOnline }) {
+function DayView({ day, items, reload, activeWorkoutId, onStartWorkout, onFinishWorkout, startedAt }) {
   const [expanded, setExpanded] = useState(null);
   const visibleItems = getDayExercises(day.n, items);
 
@@ -485,7 +461,6 @@ function DayView({ day, items, reload, activeWorkoutId, onStartWorkout, onFinish
               workoutId={activeWorkoutId}
               reload={reload}
               onNeedWorkout={() => onStartWorkout(day.n)}
-              isOnline={isOnline}
             />
           ))
         ) : (
@@ -500,203 +475,236 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedDay, setSelectedDay] = useState(1);
-  const [daysData, setDaysData] = useState(DEFAULT_EXERCISES);
+  const [daysData, setDaysData] = useState({});
   const [activeWorkouts, setActiveWorkouts] = useState({});
-  const [dbStatus, setDbStatus] = useState("checking"); // checking | connected | offline | error
-  const [dbErrorMsg, setDbErrorMsg] = useState("");
-  const [showConfigModal, setShowConfigModal] = useState(false);
+  const [dbState, setDbState] = useState({
+    status: "checking", // checking | connected | error | not_configured
+    error: ""
+  });
+  const [retryCountdown, setRetryCountdown] = useState(10);
+  const timerRef = useRef(null);
 
-  // Load active sessions from localStorage
+  // Background keep-alive ping on launch
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const activeObj = {};
-      DAYS.forEach(d => {
-        const raw = localStorage.getItem(`active-workout-${d.n}`);
-        if (raw) {
-          try {
-            activeObj[d.n] = JSON.parse(raw);
-          } catch (e) {}
-        }
-      });
-      setActiveWorkouts(activeObj);
-    }
+    fetch("/api/keepalive").catch(() => {});
   }, []);
 
-  const load = useCallback(async (isManualRefresh = false) => {
-    if (isManualRefresh) setRefreshing(true);
-    let loadedFromDb = false;
+  const loadData = useCallback(async () => {
+    if (!isSupabaseConfigured || !supabase) {
+      setDbState({
+        status: "not_configured",
+        error: "Vercel ortam değişkenlerinde NEXT_PUBLIC_SUPABASE_URL ve NEXT_PUBLIC_SUPABASE_ANON_KEY tanımlanmamış."
+      });
+      setLoading(false);
+      return;
+    }
 
-    if (supabase) {
-      try {
-        // Attempt 1: RPC get_exercises_with_last_session
-        const fetchPromise = Promise.all(
-          DAYS.map(d => supabase.rpc("get_exercises_with_last_session", { p_day_no: d.n, p_user_id: ANON_USER_ID }))
-        );
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error("Supabase zaman aşımı (3.5s)")), 3500)
-        );
+    try {
+      // 1. Try RPC get_exercises_with_last_session
+      const fetchPromise = Promise.all(
+        DAYS.map(d => supabase.rpc("get_exercises_with_last_session", { p_day_no: d.n, p_user_id: ANON_USER_ID }))
+      );
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error("Veritabanı yanıt vermedi (Proje uykuda olabilir).")), 4500)
+      );
 
-        const rs = await Promise.race([fetchPromise, timeoutPromise]);
-        const hasValidRpcData = rs.some(r => !r.error && r.data && r.data.length > 0);
+      const rs = await Promise.race([fetchPromise, timeoutPromise]);
+      const hasValidRpcData = rs.some(r => !r.error && r.data && r.data.length > 0);
 
-        if (hasValidRpcData) {
-          const next = {};
-          DAYS.forEach((d, i) => {
-            if (!rs[i].error && rs[i].data?.length > 0) {
-              next[d.n] = rs[i].data;
-            } else {
-              next[d.n] = DEFAULT_EXERCISES[d.n];
+      if (hasValidRpcData) {
+        const next = {};
+        DAYS.forEach((d, i) => {
+          next[d.n] = (!rs[i].error && rs[i].data?.length > 0) ? rs[i].data : DEFAULT_EXERCISES[d.n];
+        });
+        setDaysData(next);
+        setDbState({ status: "connected", error: "" });
+        setLoading(false);
+        return;
+      }
+
+      // 2. Direct fallback to exercises table
+      const { data: allExercises, error: exErr } = await supabase
+        .from("exercises")
+        .select("id,day_no,sort_order,name,increment_kg,default_weight,active")
+        .eq("active", true)
+        .order("sort_order");
+
+      if (exErr) {
+        throw new Error(exErr.message || "exercises tablosuna erişilemedi.");
+      }
+
+      if (allExercises && allExercises.length > 0) {
+        const { data: sets } = await supabase
+          .from("workout_sets")
+          .select("exercise_id,weight_kg,created_at")
+          .eq("user_id", ANON_USER_ID)
+          .order("created_at", { ascending: false });
+
+        const latestWeightMap = {};
+        if (sets) {
+          for (const s of sets) {
+            if (latestWeightMap[s.exercise_id] === undefined) {
+              latestWeightMap[s.exercise_id] = {
+                last_weight: s.weight_kg,
+                last_increase_at: s.created_at
+              };
             }
-          });
-          setDaysData(next);
-          setDbStatus("connected");
-          setDbErrorMsg("");
-          loadedFromDb = true;
-        } else {
-          // Attempt 2: Direct query to exercises & workout_sets
-          const { data: allExercises, error: exErr } = await supabase
-            .from("exercises")
-            .select("id,day_no,sort_order,name,increment_kg,default_weight,active")
-            .eq("active", true)
-            .order("sort_order");
-
-          if (!exErr && allExercises && allExercises.length > 0) {
-            const { data: sets } = await supabase
-              .from("workout_sets")
-              .select("exercise_id,weight_kg,created_at")
-              .eq("user_id", ANON_USER_ID)
-              .order("created_at", { ascending: false });
-
-            const latestWeightMap = {};
-            if (sets) {
-              for (const s of sets) {
-                if (latestWeightMap[s.exercise_id] === undefined) {
-                  latestWeightMap[s.exercise_id] = {
-                    last_weight: s.weight_kg,
-                    last_increase_at: s.created_at
-                  };
-                }
-              }
-            }
-
-            const next = {};
-            DAYS.forEach(d => {
-              const dayExs = allExercises
-                .filter(e => e.day_no === d.n)
-                .map(e => ({
-                  ...e,
-                  last_weight: latestWeightMap[e.id]?.last_weight ?? e.default_weight,
-                  last_increase_at: latestWeightMap[e.id]?.last_increase_at
-                }));
-              next[d.n] = dayExs.length ? dayExs : DEFAULT_EXERCISES[d.n];
-            });
-
-            setDaysData(next);
-            setDbStatus("connected");
-            setDbErrorMsg("");
-            loadedFromDb = true;
-          } else if (exErr) {
-            console.error("Supabase direct query error:", exErr);
-            setDbStatus("error");
-            setDbErrorMsg(exErr.message || "Veritabanı tablosuna ulaşılamadı.");
           }
         }
-      } catch (e) {
-        console.warn("Supabase fetch failed:", e.message);
-        setDbStatus("error");
-        setDbErrorMsg(e.message || "Bağlantı hatası.");
-      }
-    } else {
-      setDbStatus("offline");
-      setDbErrorMsg("Supabase anahtarları Vercel ortam değişkenlerinde tanımlı değil.");
-    }
 
-    // Offline / Local storage fallback only if DB could not be loaded
-    if (!loadedFromDb && typeof window !== "undefined") {
-      try {
-        const stored = localStorage.getItem("workout-local-data");
-        if (stored) {
-          const cache = JSON.parse(stored);
-          const next = { ...DEFAULT_EXERCISES };
-          DAYS.forEach(d => {
-            next[d.n] = next[d.n].map(ex => {
-              if (cache[ex.id]) {
-                return {
-                  ...ex,
-                  last_weight: cache[ex.id].last_weight,
-                  previous_weight: cache[ex.id].previous_weight,
-                  last_increase_at: cache[ex.id].updated_at
-                };
-              }
-              return ex;
-            });
-          });
-          setDaysData(next);
-        } else {
-          setDaysData(DEFAULT_EXERCISES);
-        }
-      } catch (e) {
-        setDaysData(DEFAULT_EXERCISES);
-      }
-    }
+        const next = {};
+        DAYS.forEach(d => {
+          const dayExs = allExercises
+            .filter(e => e.day_no === d.n)
+            .map(e => ({
+              ...e,
+              last_weight: latestWeightMap[e.id]?.last_weight ?? e.default_weight,
+              last_increase_at: latestWeightMap[e.id]?.last_increase_at
+            }));
+          next[d.n] = dayExs.length ? dayExs : DEFAULT_EXERCISES[d.n];
+        });
 
-    setLoading(false);
-    if (isManualRefresh) setRefreshing(false);
+        setDaysData(next);
+        setDbState({ status: "connected", error: "" });
+        setLoading(false);
+        return;
+      }
+
+      // If empty table, try to auto-seed
+      throw new Error("Veritabanında egzersiz tablosu boş. Lütfen SQL Editor'den full_setup.sql çalıştırın.");
+
+    } catch (err) {
+      console.error("Database connection error:", err);
+      setDbState({
+        status: "error",
+        error: err.message || "Veritabanı bağlantı hatası."
+      });
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
-    load();
-  }, [load]);
+    loadData();
+  }, [loadData]);
+
+  // Auto-retry countdown when DB has error
+  useEffect(() => {
+    if (dbState.status === "error") {
+      setRetryCountdown(8);
+      timerRef.current = setInterval(() => {
+        setRetryCountdown(prev => {
+          if (prev <= 1) {
+            clearInterval(timerRef.current);
+            loadData();
+            return 8;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
+      return () => {
+        if (timerRef.current) clearInterval(timerRef.current);
+      };
+    }
+  }, [dbState.status, loadData]);
 
   async function startWorkout(dayNo) {
     if (activeWorkouts[dayNo]?.id) return activeWorkouts[dayNo].id;
-    const nowIso = new Date().toISOString();
-    const fakeId = `local-workout-${Date.now()}`;
+    if (!supabase) return null;
 
-    if (supabase) {
-      try {
-        const w = await supabase
-          .from("workouts")
-          .insert({ user_id: ANON_USER_ID, workout_day: dayNo })
-          .select("id,performed_at")
-          .single();
+    try {
+      const w = await supabase
+        .from("workouts")
+        .insert({ user_id: ANON_USER_ID, workout_day: dayNo })
+        .select("id,performed_at")
+        .single();
 
-        if (!w.error && w.data) {
-          const data = { id: w.data.id, startedAt: w.data.performed_at };
-          localStorage.setItem(`active-workout-${dayNo}`, JSON.stringify(data));
-          setActiveWorkouts(prev => ({ ...prev, [dayNo]: data }));
-          return w.data.id;
-        }
-      } catch (e) {
-        console.warn("Supabase startWorkout error:", e);
+      if (!w.error && w.data) {
+        const data = { id: w.data.id, startedAt: w.data.performed_at };
+        setActiveWorkouts(prev => ({ ...prev, [dayNo]: data }));
+        return w.data.id;
       }
+    } catch (e) {
+      console.warn("startWorkout error:", e);
     }
-
-    const data = { id: fakeId, startedAt: nowIso };
-    if (typeof window !== "undefined") {
-      localStorage.setItem(`active-workout-${dayNo}`, JSON.stringify(data));
-    }
-    setActiveWorkouts(prev => ({ ...prev, [dayNo]: data }));
-    return fakeId;
+    return null;
   }
 
   function finishWorkout(dayNo) {
-    if (typeof window !== "undefined") {
-      localStorage.removeItem(`active-workout-${dayNo}`);
-    }
     setActiveWorkouts(prev => {
       const copy = { ...prev };
       delete copy[dayNo];
       return copy;
     });
-    load();
+    loadData();
   }
 
+  // 1. Initial Loading Screen
   if (loading) {
     return (
       <main className="loading-center">
         <div className="loading-spinner" />
-        <p>Antrenman programı ve bulut verileri yükleniyor…</p>
+        <p className="loading-text">Veritabanına bağlanılıyor ve canlı veriler çekiliyor…</p>
+        <span className="loading-subtext">Cihazlar arası eşitlik için doğrudan bulut sorgulanıyor.</span>
+      </main>
+    );
+  }
+
+  // 2. DATABASE ERROR / PAUSED SCREEN (No LocalStorage fallback)
+  if (dbState.status === "error" || dbState.status === "not_configured") {
+    return (
+      <main className="db-offline-screen">
+        <div className="db-offline-card">
+          <div className="offline-icon-wrap">
+            <AlertTriangle size={36} className="offline-icon" />
+          </div>
+
+          <h2 className="offline-title">
+            {dbState.status === "not_configured" 
+              ? "Veritabanı Ayarları Eksik" 
+              : "Veritabanı Bağlantısı Bekleniyor"}
+          </h2>
+
+          <p className="offline-desc">
+            {dbState.status === "not_configured"
+              ? "Vercel üzerinde NEXT_PUBLIC_SUPABASE_URL ve ANON_KEY değişkenleri tanımlanmamış."
+              : "Supabase veritabanı uykuda (Paused) olabilir veya uyanıyor. Veri kaybını ve cihazlar arası tutarsızlığı önlemek için yerel kayıt devre dışı bırakılmıştır."}
+          </p>
+
+          {dbState.error && (
+            <div className="offline-error-box">
+              <code>{dbState.error}</code>
+            </div>
+          )}
+
+          <div className="offline-auto-retry">
+            <span className="pulse-dot warn" />
+            <span><strong>{retryCountdown}</strong> saniye sonra otomatik tekrar denenecek…</span>
+          </div>
+
+          <div className="offline-actions">
+            <button 
+              className="btn-retry" 
+              onClick={() => { setLoading(true); loadData(); }}
+            >
+              <RotateCcw size={17} /> Şimdi Tekrar Dene
+            </button>
+
+            <a 
+              href="https://supabase.com/dashboard" 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="btn-supabase-link"
+            >
+              <ExternalLink size={16} /> Supabase Konsoluna Git (Resume Project)
+            </a>
+          </div>
+
+          <div className="offline-guarantee">
+            <ShieldCheck size={16} />
+            <span>Tüm antrenman verileriniz yalnızca merkezi bulutta tutulur.</span>
+          </div>
+        </div>
       </main>
     );
   }
@@ -717,52 +725,27 @@ export default function Home() {
         </div>
 
         <div className="header-actions">
-          {/* Cloud Sync Status Indicator */}
-          <button 
-            className={`sync-status-badge ${dbStatus}`}
-            onClick={() => setShowConfigModal(true)}
-            title="Veritabanı Durumu ve Senkronizasyon"
-          >
-            {dbStatus === "connected" ? (
-              <>
-                <Cloud size={14} className="badge-icon ok" />
-                <span className="badge-text">Bulut Canlı</span>
-              </>
-            ) : dbStatus === "offline" ? (
-              <>
-                <CloudOff size={14} className="badge-icon warn" />
-                <span className="badge-text">Yerel Mod</span>
-              </>
-            ) : (
-              <>
-                <AlertCircle size={14} className="badge-icon error" />
-                <span className="badge-text">Bağlantı Hatası</span>
-              </>
-            )}
-          </button>
+          {/* Cloud Live Status */}
+          <div className="sync-status-badge connected" title="Tüm cihazlar Supabase veritabanı ile canlı eşleşiyor">
+            <Cloud size={14} className="badge-icon ok" />
+            <span className="badge-text">Bulut Canlı</span>
+          </div>
 
           {/* Quick Reload Button */}
           <button 
             className={`refresh-btn ${refreshing ? "is-spinning" : ""}`}
-            onClick={() => load(true)}
+            onClick={async () => {
+              setRefreshing(true);
+              await loadData();
+              setRefreshing(false);
+            }}
             aria-label="Buluttan Verileri Yenile"
-            title="Tüm cihazlardan son kayıtları çek"
+            title="Diğer cihazlardan gelen son kayıtları çek"
           >
             <RefreshCw size={17} />
           </button>
         </div>
       </header>
-
-      {/* Sync Warning Banner if offline or error */}
-      {dbStatus !== "connected" && (
-        <div className="sync-warning-banner" onClick={() => setShowConfigModal(true)}>
-          <AlertCircle size={18} className="warn-icon" />
-          <div className="warn-text">
-            <strong>Cihazlar Arası Eşitleme Kapalı ({dbStatus === "offline" ? "Yerel Hafıza" : "Bağlantı Sorunu"})</strong>
-            <span>Kayıtların tüm telefon ve bilgisayarlarında aynı görünmesi için dokun.</span>
-          </div>
-        </div>
-      )}
 
       {/* Day Segmented Tabs */}
       <nav className="day-tabs" role="tablist">
@@ -787,65 +770,12 @@ export default function Home() {
       <DayView
         day={DAYS.find(d => d.n === selectedDay) || DAYS[0]}
         items={daysData[selectedDay] || []}
-        reload={load}
+        reload={loadData}
         activeWorkoutId={activeDaySession?.id}
         startedAt={activeDaySession?.startedAt}
         onStartWorkout={startWorkout}
         onFinishWorkout={finishWorkout}
-        isOnline={dbStatus === "connected"}
       />
-
-      {/* Cloud Status Modal */}
-      {showConfigModal && (
-        <div className="modal-backdrop" onClick={() => setShowConfigModal(false)}>
-          <div className="modal-card" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>⚡ Cihazlar Arası Canlı Eşitleme</h3>
-              <button className="modal-close-btn" onClick={() => setShowConfigModal(false)}>✕</button>
-            </div>
-            <div className="modal-body">
-              <div className="status-box">
-                <span className="status-label">Supabase Durumu:</span>
-                <span className={`status-pill ${dbStatus}`}>
-                  {dbStatus === "connected" && "🟢 Canlı & Senkronize (Tüm Cihazlar Eşit)"}
-                  {dbStatus === "offline" && "🟡 Çevrimdışı / Yerel Hafıza (Sadece Bu Cihaz)"}
-                  {dbStatus === "error" && "🔴 Hata / SQL Tablo Eksik"}
-                </span>
-              </div>
-
-              {dbErrorMsg && (
-                <div className="error-detail-box">
-                  <strong>Detay:</strong> {dbErrorMsg}
-                </div>
-              )}
-
-              <div className="modal-instructions">
-                <h4>Farklı cihazlarda aynı değerlerin görünmesi için 2 adım:</h4>
-                <ol>
-                  <li>
-                    <strong>Vercel Ortam Değişkenleri:</strong>
-                    <p>Vercel panelinizde <code>Settings &gt; Environment Variables</code> kısmına şu iki anahtarı ekleyin ve ardından <code>Deployments &gt; Redeploy</code> yapın:</p>
-                    <div className="code-block">
-                      <code>NEXT_PUBLIC_SUPABASE_URL</code><br/>
-                      <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code>
-                    </div>
-                  </li>
-                  <li>
-                    <strong>Supabase SQL Tablo Kurulumu:</strong>
-                    <p>Supabase SQL Editor&apos;e girip <code>supabase/full_setup.sql</code> dosyasındaki kodları yapıştırıp <strong>RUN</strong> butonuna basın.</p>
-                  </li>
-                </ol>
-              </div>
-
-              <div className="modal-actions">
-                <button className="btn-modal-primary" onClick={() => { setShowConfigModal(false); load(true); }}>
-                  Yeniden Kontrol Et & Senkronize Et
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </main>
   );
 }
