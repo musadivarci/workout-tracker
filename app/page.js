@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { 
   Minus, 
@@ -11,13 +11,23 @@ import {
   TrendingUp, 
   History, 
   ChevronDown, 
-  Zap
+  Zap,
+  RefreshCw,
+  Cloud,
+  CloudOff,
+  AlertCircle
 } from "lucide-react";
 
 // Check for valid Supabase credentials
 const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const rawKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
-const isSupabaseConfigured = rawUrl && !rawUrl.includes("YOUR_PROJECT") && !rawUrl.includes("placeholder") && rawKey && !rawKey.includes("YOUR_ANON_KEY");
+const isSupabaseConfigured = Boolean(
+  rawUrl && 
+  !rawUrl.includes("YOUR_PROJECT") && 
+  !rawUrl.includes("placeholder") && 
+  rawKey && 
+  !rawKey.includes("YOUR_ANON_KEY")
+);
 
 const supabase = isSupabaseConfigured 
   ? createClient(rawUrl, rawKey)
@@ -75,17 +85,17 @@ function getDayExercises(dayNo, items) {
   const defaults = DEFAULT_EXERCISES[dayNo] || [];
   if (!items || items.length === 0) return defaults;
 
-  // Map server items to default structure, preserving real database UUID
-  return defaults.map((def, idx) => {
+  return defaults.map((def) => {
     const matched = items.find(it => 
       it.id === def.id || 
       it.name?.trim().toLowerCase() === def.name?.trim().toLowerCase() ||
-      DISPLAY_NAMES[it.name]?.trim().toLowerCase() === def.name?.trim().toLowerCase()
+      DISPLAY_NAMES[it.name]?.trim().toLowerCase() === def.name?.trim().toLowerCase() ||
+      DISPLAY_NAMES[def.name]?.trim().toLowerCase() === it.name?.trim().toLowerCase()
     );
     if (matched) {
       return {
         ...def,
-        id: matched.id || def.id, // Preserves the real database UUID from Supabase
+        id: matched.id || def.id,
         last_weight: matched.last_weight != null ? Number(matched.last_weight) : def.default_weight,
         previous_weight: matched.previous_weight != null ? Number(matched.previous_weight) : undefined,
         last_increase_at: matched.last_increase_at
@@ -96,7 +106,7 @@ function getDayExercises(dayNo, items) {
 }
 
 // Single Exercise Row Component
-function Exercise({ ex, index, expanded, onToggle, workoutId, reload, onNeedWorkout }) {
+function Exercise({ ex, index, expanded, onToggle, workoutId, reload, onNeedWorkout, isOnline }) {
   const isBodyweight = ex.virtual === true;
   const isBarbell = /barbell/i.test(ex.name);
   const isDumbbell = /dumbbell/i.test(ex.name);
@@ -151,24 +161,51 @@ function Exercise({ ex, index, expanded, onToggle, workoutId, reload, onNeedWork
 
     try {
       if (supabase) {
-        // If ex.id is a temporary fake string, find or insert exercise in Supabase
+        // 1. Ensure exercise exists with real UUID in Supabase
         let validExerciseId = ex.id;
         const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(ex.id);
         
         if (!isUuid) {
-          // Look up real UUID from exercises table by name
           const lookup = await supabase.from("exercises").select("id").ilike("name", ex.name).limit(1);
           if (lookup.data && lookup.data[0]?.id) {
             validExerciseId = lookup.data[0].id;
+          } else {
+            const insEx = await supabase.from("exercises").insert({
+              day_no: ex.day_no || 1,
+              sort_order: ex.sort_order || 1,
+              name: ex.name,
+              increment_kg: ex.increment_kg || 2.5,
+              default_weight: ex.default_weight || 0
+            }).select("id").single();
+            if (insEx.data?.id) {
+              validExerciseId = insEx.data.id;
+            }
           }
         }
 
-        if (isUuid || validExerciseId !== ex.id) {
-          await supabase.from("workout_sets").delete().eq("workout_id", wid).eq("exercise_id", validExerciseId);
+        // 2. Ensure workout_id is a valid UUID
+        let validWorkoutId = wid;
+        const isWorkoutUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(wid);
+        if (!isWorkoutUuid) {
+          const newWorkout = await supabase.from("workouts").insert({
+            user_id: ANON_USER_ID,
+            workout_day: ex.day_no || 1
+          }).select("id").single();
+          if (newWorkout.data?.id) {
+            validWorkoutId = newWorkout.data.id;
+          }
+        }
+
+        // 3. Save sets to Supabase
+        const isReadyUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(validExerciseId);
+        const isReadyWorkout = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(validWorkoutId);
+
+        if (isReadyUuid && isReadyWorkout) {
+          await supabase.from("workout_sets").delete().eq("workout_id", validWorkoutId).eq("exercise_id", validExerciseId);
           const reps = ex.last_reps?.length ? ex.last_reps : [12, 12, 12];
           const rows = reps.map((r, i) => ({
             user_id: ANON_USER_ID,
-            workout_id: wid,
+            workout_id: validWorkoutId,
             exercise_id: validExerciseId,
             set_no: i + 1,
             weight_kg: saveKg,
@@ -177,12 +214,12 @@ function Exercise({ ex, index, expanded, onToggle, workoutId, reload, onNeedWork
           const insertRes = await supabase.from("workout_sets").insert(rows);
           if (insertRes.error) {
             console.error("Supabase insert error:", insertRes.error);
-            alert("Veritabanı kayıt hatası: " + insertRes.error.message);
+            alert("Bulut Veritabanı Hatası: " + insertRes.error.message + "\n(Lütfen Supabase tablosunun açık olduğundan emin olun.)");
           }
         }
       }
 
-      // Save to local storage cache
+      // Always update local cache for instant feedback & offline fallback
       if (typeof window !== "undefined") {
         const stored = localStorage.getItem("workout-local-data");
         const cache = stored ? JSON.parse(stored) : {};
@@ -193,7 +230,6 @@ function Exercise({ ex, index, expanded, onToggle, workoutId, reload, onNeedWork
         };
         localStorage.setItem("workout-local-data", JSON.stringify(cache));
 
-        // Save to local history
         const histKey = `history-${ex.id}`;
         const histRaw = localStorage.getItem(histKey);
         const histArr = histRaw ? JSON.parse(histRaw) : [];
@@ -206,7 +242,7 @@ function Exercise({ ex, index, expanded, onToggle, workoutId, reload, onNeedWork
       await reload();
     } catch (err) {
       console.error("Save error:", err);
-      alert("Hata: " + (err.message || err));
+      alert("Kayıt hatası: " + (err.message || err));
     } finally {
       setBusy(false);
     }
@@ -223,10 +259,19 @@ function Exercise({ ex, index, expanded, onToggle, workoutId, reload, onNeedWork
     setHistoryBusy(true);
     try {
       if (supabase) {
+        let targetId = ex.id;
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(ex.id);
+        if (!isUuid) {
+          const lookup = await supabase.from("exercises").select("id").ilike("name", ex.name).limit(1);
+          if (lookup.data && lookup.data[0]?.id) {
+            targetId = lookup.data[0].id;
+          }
+        }
+
         const q = await supabase
           .from("workout_sets")
           .select("workout_id,weight_kg,created_at")
-          .eq("exercise_id", ex.id)
+          .eq("exercise_id", targetId)
           .order("created_at", { ascending: false })
           .limit(36);
 
@@ -245,7 +290,6 @@ function Exercise({ ex, index, expanded, onToggle, workoutId, reload, onNeedWork
         }
       }
 
-      // Fallback to local history
       if (typeof window !== "undefined") {
         const histKey = `history-${ex.id}`;
         const histRaw = localStorage.getItem(histKey);
@@ -313,7 +357,7 @@ function Exercise({ ex, index, expanded, onToggle, workoutId, reload, onNeedWork
                 <span className="stepper-target">Sonraki Kademe: <strong>{suggested} kg</strong></span>
               </div>
 
-              {/* Big Stepper */}
+              {/* Stepper Container */}
               <div className="stepper-container">
                 <button
                   className="stepper-btn"
@@ -335,7 +379,7 @@ function Exercise({ ex, index, expanded, onToggle, workoutId, reload, onNeedWork
                 </button>
               </div>
 
-              {/* Quick Jump Buttons for Fast Adjustments */}
+              {/* Quick Jump Buttons */}
               <div className="quick-jump-row">
                 <button className="jump-btn" onClick={() => handleStep(-5)}>-5 kg</button>
                 <button className="jump-btn" onClick={() => handleStep(-2.5)}>-2.5 kg</button>
@@ -378,7 +422,7 @@ function Exercise({ ex, index, expanded, onToggle, workoutId, reload, onNeedWork
               >
                 {saved ? (
                   <>
-                    <Check size={18} /> Kaydedildi & Güncellendi
+                    <Check size={18} /> Kaydedildi & Senkronize Edildi
                   </>
                 ) : (
                   <>
@@ -395,7 +439,7 @@ function Exercise({ ex, index, expanded, onToggle, workoutId, reload, onNeedWork
 }
 
 // Day Section Component
-function DayView({ day, items, reload, activeWorkoutId, onStartWorkout, onFinishWorkout, startedAt }) {
+function DayView({ day, items, reload, activeWorkoutId, onStartWorkout, onFinishWorkout, startedAt, isOnline }) {
   const [expanded, setExpanded] = useState(null);
   const visibleItems = getDayExercises(day.n, items);
 
@@ -441,6 +485,7 @@ function DayView({ day, items, reload, activeWorkoutId, onStartWorkout, onFinish
               workoutId={activeWorkoutId}
               reload={reload}
               onNeedWorkout={() => onStartWorkout(day.n)}
+              isOnline={isOnline}
             />
           ))
         ) : (
@@ -453,9 +498,13 @@ function DayView({ day, items, reload, activeWorkoutId, onStartWorkout, onFinish
 
 export default function Home() {
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [selectedDay, setSelectedDay] = useState(1);
   const [daysData, setDaysData] = useState(DEFAULT_EXERCISES);
   const [activeWorkouts, setActiveWorkouts] = useState({});
+  const [dbStatus, setDbStatus] = useState("checking"); // checking | connected | offline | error
+  const [dbErrorMsg, setDbErrorMsg] = useState("");
+  const [showConfigModal, setShowConfigModal] = useState(false);
 
   // Load active sessions from localStorage
   useEffect(() => {
@@ -473,35 +522,96 @@ export default function Home() {
     }
   }, []);
 
-  async function load() {
+  const load = useCallback(async (isManualRefresh = false) => {
+    if (isManualRefresh) setRefreshing(true);
     let loadedFromDb = false;
 
     if (supabase) {
       try {
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error("Timeout")), 3000)
-        );
-
+        // Attempt 1: RPC get_exercises_with_last_session
         const fetchPromise = Promise.all(
           DAYS.map(d => supabase.rpc("get_exercises_with_last_session", { p_day_no: d.n, p_user_id: ANON_USER_ID }))
         );
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error("Supabase zaman aşımı (3.5s)")), 3500)
+        );
 
         const rs = await Promise.race([fetchPromise, timeoutPromise]);
-        
-        const hasData = rs.some(r => r.data && r.data.length > 0);
-        if (hasData) {
+        const hasValidRpcData = rs.some(r => !r.error && r.data && r.data.length > 0);
+
+        if (hasValidRpcData) {
           const next = {};
           DAYS.forEach((d, i) => {
-            next[d.n] = rs[i].error ? DEFAULT_EXERCISES[d.n] : (rs[i].data?.length ? rs[i].data : DEFAULT_EXERCISES[d.n]);
+            if (!rs[i].error && rs[i].data?.length > 0) {
+              next[d.n] = rs[i].data;
+            } else {
+              next[d.n] = DEFAULT_EXERCISES[d.n];
+            }
           });
           setDaysData(next);
+          setDbStatus("connected");
+          setDbErrorMsg("");
           loadedFromDb = true;
+        } else {
+          // Attempt 2: Direct query to exercises & workout_sets
+          const { data: allExercises, error: exErr } = await supabase
+            .from("exercises")
+            .select("id,day_no,sort_order,name,increment_kg,default_weight,active")
+            .eq("active", true)
+            .order("sort_order");
+
+          if (!exErr && allExercises && allExercises.length > 0) {
+            const { data: sets } = await supabase
+              .from("workout_sets")
+              .select("exercise_id,weight_kg,created_at")
+              .eq("user_id", ANON_USER_ID)
+              .order("created_at", { ascending: false });
+
+            const latestWeightMap = {};
+            if (sets) {
+              for (const s of sets) {
+                if (latestWeightMap[s.exercise_id] === undefined) {
+                  latestWeightMap[s.exercise_id] = {
+                    last_weight: s.weight_kg,
+                    last_increase_at: s.created_at
+                  };
+                }
+              }
+            }
+
+            const next = {};
+            DAYS.forEach(d => {
+              const dayExs = allExercises
+                .filter(e => e.day_no === d.n)
+                .map(e => ({
+                  ...e,
+                  last_weight: latestWeightMap[e.id]?.last_weight ?? e.default_weight,
+                  last_increase_at: latestWeightMap[e.id]?.last_increase_at
+                }));
+              next[d.n] = dayExs.length ? dayExs : DEFAULT_EXERCISES[d.n];
+            });
+
+            setDaysData(next);
+            setDbStatus("connected");
+            setDbErrorMsg("");
+            loadedFromDb = true;
+          } else if (exErr) {
+            console.error("Supabase direct query error:", exErr);
+            setDbStatus("error");
+            setDbErrorMsg(exErr.message || "Veritabanı tablosuna ulaşılamadı.");
+          }
         }
       } catch (e) {
-        console.warn("Supabase load fallback:", e.message);
+        console.warn("Supabase fetch failed:", e.message);
+        setDbStatus("error");
+        setDbErrorMsg(e.message || "Bağlantı hatası.");
       }
+    } else {
+      setDbStatus("offline");
+      setDbErrorMsg("Supabase anahtarları Vercel ortam değişkenlerinde tanımlı değil.");
     }
 
+    // Offline / Local storage fallback only if DB could not be loaded
     if (!loadedFromDb && typeof window !== "undefined") {
       try {
         const stored = localStorage.getItem("workout-local-data");
@@ -531,11 +641,12 @@ export default function Home() {
     }
 
     setLoading(false);
-  }
+    if (isManualRefresh) setRefreshing(false);
+  }, []);
 
   useEffect(() => {
     load();
-  }, []);
+  }, [load]);
 
   async function startWorkout(dayNo) {
     if (activeWorkouts[dayNo]?.id) return activeWorkouts[dayNo].id;
@@ -561,7 +672,6 @@ export default function Home() {
       }
     }
 
-    // Fallback local session
     const data = { id: fakeId, startedAt: nowIso };
     if (typeof window !== "undefined") {
       localStorage.setItem(`active-workout-${dayNo}`, JSON.stringify(data));
@@ -586,7 +696,7 @@ export default function Home() {
     return (
       <main className="loading-center">
         <div className="loading-spinner" />
-        <p>Antrenman programı yükleniyor…</p>
+        <p>Antrenman programı ve bulut verileri yükleniyor…</p>
       </main>
     );
   }
@@ -605,7 +715,54 @@ export default function Home() {
           <h1 className="app-title">Antrenman Takibi</h1>
           <p className="app-subtitle">İlerleyen yükleme ve güç kayıtların</p>
         </div>
+
+        <div className="header-actions">
+          {/* Cloud Sync Status Indicator */}
+          <button 
+            className={`sync-status-badge ${dbStatus}`}
+            onClick={() => setShowConfigModal(true)}
+            title="Veritabanı Durumu ve Senkronizasyon"
+          >
+            {dbStatus === "connected" ? (
+              <>
+                <Cloud size={14} className="badge-icon ok" />
+                <span className="badge-text">Bulut Canlı</span>
+              </>
+            ) : dbStatus === "offline" ? (
+              <>
+                <CloudOff size={14} className="badge-icon warn" />
+                <span className="badge-text">Yerel Mod</span>
+              </>
+            ) : (
+              <>
+                <AlertCircle size={14} className="badge-icon error" />
+                <span className="badge-text">Bağlantı Hatası</span>
+              </>
+            )}
+          </button>
+
+          {/* Quick Reload Button */}
+          <button 
+            className={`refresh-btn ${refreshing ? "is-spinning" : ""}`}
+            onClick={() => load(true)}
+            aria-label="Buluttan Verileri Yenile"
+            title="Tüm cihazlardan son kayıtları çek"
+          >
+            <RefreshCw size={17} />
+          </button>
+        </div>
       </header>
+
+      {/* Sync Warning Banner if offline or error */}
+      {dbStatus !== "connected" && (
+        <div className="sync-warning-banner" onClick={() => setShowConfigModal(true)}>
+          <AlertCircle size={18} className="warn-icon" />
+          <div className="warn-text">
+            <strong>Cihazlar Arası Eşitleme Kapalı ({dbStatus === "offline" ? "Yerel Hafıza" : "Bağlantı Sorunu"})</strong>
+            <span>Kayıtların tüm telefon ve bilgisayarlarında aynı görünmesi için dokun.</span>
+          </div>
+        </div>
+      )}
 
       {/* Day Segmented Tabs */}
       <nav className="day-tabs" role="tablist">
@@ -635,11 +792,60 @@ export default function Home() {
         startedAt={activeDaySession?.startedAt}
         onStartWorkout={startWorkout}
         onFinishWorkout={finishWorkout}
+        isOnline={dbStatus === "connected"}
       />
+
+      {/* Cloud Status Modal */}
+      {showConfigModal && (
+        <div className="modal-backdrop" onClick={() => setShowConfigModal(false)}>
+          <div className="modal-card" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>⚡ Cihazlar Arası Canlı Eşitleme</h3>
+              <button className="modal-close-btn" onClick={() => setShowConfigModal(false)}>✕</button>
+            </div>
+            <div className="modal-body">
+              <div className="status-box">
+                <span className="status-label">Supabase Durumu:</span>
+                <span className={`status-pill ${dbStatus}`}>
+                  {dbStatus === "connected" && "🟢 Canlı & Senkronize (Tüm Cihazlar Eşit)"}
+                  {dbStatus === "offline" && "🟡 Çevrimdışı / Yerel Hafıza (Sadece Bu Cihaz)"}
+                  {dbStatus === "error" && "🔴 Hata / SQL Tablo Eksik"}
+                </span>
+              </div>
+
+              {dbErrorMsg && (
+                <div className="error-detail-box">
+                  <strong>Detay:</strong> {dbErrorMsg}
+                </div>
+              )}
+
+              <div className="modal-instructions">
+                <h4>Farklı cihazlarda aynı değerlerin görünmesi için 2 adım:</h4>
+                <ol>
+                  <li>
+                    <strong>Vercel Ortam Değişkenleri:</strong>
+                    <p>Vercel panelinizde <code>Settings &gt; Environment Variables</code> kısmına şu iki anahtarı ekleyin ve ardından <code>Deployments &gt; Redeploy</code> yapın:</p>
+                    <div className="code-block">
+                      <code>NEXT_PUBLIC_SUPABASE_URL</code><br/>
+                      <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code>
+                    </div>
+                  </li>
+                  <li>
+                    <strong>Supabase SQL Tablo Kurulumu:</strong>
+                    <p>Supabase SQL Editor&apos;e girip <code>supabase/full_setup.sql</code> dosyasındaki kodları yapıştırıp <strong>RUN</strong> butonuna basın.</p>
+                  </li>
+                </ol>
+              </div>
+
+              <div className="modal-actions">
+                <button className="btn-modal-primary" onClick={() => { setShowConfigModal(false); load(true); }}>
+                  Yeniden Kontrol Et & Senkronize Et
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
-
-
-
-
