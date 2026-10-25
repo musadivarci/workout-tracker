@@ -1,4 +1,22 @@
-# Workout Tracker
+# 🏋️‍♂️ Workout Tracker
+
+<div align="center">
+
+![Next.js](https://img.shields.io/badge/Next.js-15.0-black?style=for-the-badge&logo=nextdotjs&logoColor=white)
+![React](https://img.shields.io/badge/React-19.0-61DAFB?style=for-the-badge&logo=react&logoColor=black)
+![Supabase](https://img.shields.io/badge/Supabase-Database%20%26%20Auth-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.0-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
+![Vercel](https://img.shields.io/badge/Vercel-Deployed-black?style=for-the-badge&logo=vercel&logoColor=white)
+
+### Mobile-First Personal Training OS
+*Designed for zero-friction data entry during active gym sets.*
+
+**Engineered by Musa Divarcı**
+
+---
+
+</div>
 
 A mobile-first personal training tracker built for fast use during real gym sessions.
 
@@ -36,6 +54,15 @@ This is a small project by scope, but deliberately product-driven: the UX is sha
 ## Status
 
 Actively developed as a personal software product and an exploration of mobile-first UX, lightweight data modeling and serverless application architecture.
+
+---
+
+## Author
+
+**Musa Divarcı** — Software Developer & Technology Leader  
+- 🌍 **Website:** [musadivarci.com.tr](https://www.musadivarci.com.tr/)  
+- 💼 **LinkedIn:** [linkedin.com/in/musa-divarci-9280515a](https://www.linkedin.com/in/musa-divarci-9280515a)  
+- 🐙 **GitHub:** [@musadivarci](https://github.com/musadivarci)
 
 ---
 
